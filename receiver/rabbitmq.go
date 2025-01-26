@@ -17,13 +17,11 @@ func (c *RabbitMQConsumer) NewConsumer(url, queueName string) (Consumer, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
-	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open a channel: %w", err)
 	}
-	defer ch.Close()
 
 	queue, err := ch.QueueDeclare(
 		"txns",
@@ -44,7 +42,8 @@ func (c *RabbitMQConsumer) NewConsumer(url, queueName string) (Consumer, error) 
 	}, nil
 }
 
-func (c *RabbitMQConsumer) Start(ctx context.Context) error {
+func (c *RabbitMQConsumer) Start(ctx context.Context, dataTier *types.DataWrapper) error {
+	fmt.Println("Came to start: queue name: ", c.queue.Name)
 	msgs, err := c.ch.ConsumeWithContext(
 		ctx,
 		c.queue.Name,
@@ -56,18 +55,20 @@ func (c *RabbitMQConsumer) Start(ctx context.Context) error {
 		nil,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to register a consumer: %w", err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
+			c.Close()
 			return nil
 		case msg, ok := <-msgs:
 			if !ok {
+				c.Close()
 				return nil
 			}
-			if err := c.processMessage(msg); err != nil {
+			if err := c.processMessage(msg, dataTier); err != nil {
 				log.Printf("error processing message: %v", err)
 				msg.Nack(false, true)
 			} else {
@@ -77,13 +78,15 @@ func (c *RabbitMQConsumer) Start(ctx context.Context) error {
 	}
 }
 
-func (c *RabbitMQConsumer) processMessage(msg amqp.Delivery) error {
+func (c *RabbitMQConsumer) processMessage(msg amqp.Delivery, dataTier *types.DataWrapper) error {
 	msgBody := msg.Body
+	fmt.Println(msg.Timestamp)
 	trnx := &types.TrnxMsg{}
 	if err := json.Unmarshal(msgBody, trnx); err != nil {
 		return fmt.Errorf("unable to Unmarshall transaction msg body into : %T with err: %w", reflect.TypeOf(trnx), err)
 	}
 	// Extra logic goes here like updating the price in db & redis
+	fmt.Println("Received the transaction object: ", trnx)
 	return nil
 }
 
