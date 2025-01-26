@@ -4,31 +4,46 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/kridavyuha/trade-core/receiver"
+	"github.com/kridavyuha/trade-core/types"
 )
 
-// write a http server here which listens on port 8082 and
+var leagueStatusMap = make(map[string]LeagueStatus)
+
 func main() {
-	db, err := initDB()
+	dataTier := &types.DataWrapper{}
+	err := initDB(dataTier)
 	if err != nil {
 		log.Panic("Unable to start the database")
 	}
+	initKVStore(dataTier)
+
+	rabbitMQurl := "amqp://guest:guest@localhost:5672/"
+	err = initProducer(rabbitMQurl)
+	if err != nil {
+		log.Panic("Unable to start the producer")
+	}
 
 	rabbitMQConsumer := &receiver.RabbitMQConsumer{}
-	consumer, err := rabbitMQConsumer.NewConsumer("", "")
+	consumer, err := rabbitMQConsumer.NewConsumer(rabbitMQurl, "txns")
 	if err != nil {
 		log.Panic("Unable to create the consumer")
 	}
 
+	var forever chan struct{}
 	ctx, cancel := context.WithCancel(context.TODO())
 	go func() {
-		err := consumer.Start(ctx)
+		err := consumer.Start(ctx, dataTier)
 		if err != nil {
-			fmt.Printf("unable to start the consumer")
+			fmt.Printf("unable to start the consumer: %w", err)
 			cancel()
 		}
 	}()
 
-	// Think about a way to not let the main goroutine close -- servers or something else
+	fetchLeagueStatusFromDBTicker := time.NewTicker(5 * time.Minute)
+	go fetchLeaguesStatusFromDB(ctx, fetchLeagueStatusFromDBTicker, dataTier)
+
+	<-forever
 }
