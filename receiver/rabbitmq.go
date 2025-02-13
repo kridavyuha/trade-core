@@ -12,20 +12,46 @@ import (
 	types "github.com/kridavyuha/trade-core/types"
 )
 
-func (c *RabbitMQConsumer) NewConsumer(url, queueName string) (Consumer, error) {
+func NewRabbitMQ(url string) (*RabbitMQ, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
+	return &RabbitMQ{conn}, nil
+}
 
-	ch, err := conn.Channel()
+func (r *RabbitMQ) CreateExchange(exchangeName string) error {
+	ch, err := r.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("failed to open a channel for creating exchange: %w", err)
+	}
+	defer ch.Close()
+
+	err = ch.ExchangeDeclare(
+		exchangeName,
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to declare an exchange: %w", err)
+	}
+	return nil
+}
+
+func (rabbitmq *RabbitMQ) NewConsumer(queueName, exchangeName, routingKey string) (Consumer, error) {
+	// First create a channel to communicate with the RabbitMQ server
+	ch, err := rabbitmq.conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open a channel: %w", err)
 	}
-
+	// Declare a queue using the channel
 	queue, err := ch.QueueDeclare(
-		"txns",
-		false,
+		queueName,
+		true,
 		false,
 		false,
 		false,
@@ -34,17 +60,23 @@ func (c *RabbitMQConsumer) NewConsumer(url, queueName string) (Consumer, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to declare a queue: %w", err)
 	}
-
-	return &RabbitMQConsumer{
-		conn,
-		ch,
-		queue,
-	}, nil
+	// Bind this existing queue to a specific exchange with a routing key
+	err = ch.QueueBind(
+		queueName,
+		routingKey,
+		exchangeName,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind a queue: %w", err)
+	}
+	return &RabbitMQConsumer{ch, queue}, nil
 }
 
-func (c *RabbitMQConsumer) Start(ctx context.Context, dataTier *types.DataWrapper) error {
+func (c *RabbitMQConsumer) StartConsuming(ctx context.Context, routingKey string, dataTier *types.DataWrapper) error {
 	fmt.Println("Came to start: queue name: ", c.queue.Name)
-	msgs, err := c.ch.ConsumeWithContext(
+	msgs, err := c.channel.ConsumeWithContext(
 		ctx,
 		c.queue.Name,
 		"",
@@ -61,11 +93,11 @@ func (c *RabbitMQConsumer) Start(ctx context.Context, dataTier *types.DataWrappe
 	for {
 		select {
 		case <-ctx.Done():
-			c.Close()
+			c.CloseConsumer(routingKey)
 			return nil
 		case msg, ok := <-msgs:
 			if !ok {
-				c.Close()
+				c.CloseConsumer(routingKey)
 				return nil
 			}
 			if err := c.processMessage(msg, dataTier); err != nil {
@@ -90,11 +122,19 @@ func (c *RabbitMQConsumer) processMessage(msg amqp.Delivery, dataTier *types.Dat
 	return nil
 }
 
-func (c *RabbitMQConsumer) Close() {
-	if c.ch != nil {
-		c.ch.Close()
+func (c *RabbitMQConsumer) CloseConsumer(key string) error {
+	err := c.channel.QueueUnbind(
+		c.queue.Name,
+		key,
+		"txns",
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to unbind a queue: %w", err)
 	}
-	if c.conn != nil {
-		c.conn.Close()
+	err = c.channel.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close a channel: %w", err)
 	}
+	return nil
 }

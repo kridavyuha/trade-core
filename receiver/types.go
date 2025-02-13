@@ -8,13 +8,15 @@ import (
 )
 
 type Consumer interface {
-	NewConsumer(string, string) (Consumer, error)
-	Start(context.Context, *types.DataWrapper) error
-	Close()
+	StartConsuming(context.Context, string, *types.DataWrapper) error
+	CloseConsumer(string) error
 }
 
 type RabbitMQConsumer struct {
-	conn  *amqp.Connection
-	ch    *amqp.Channel
-	queue amqp.Queue
+	channel *amqp.Channel
+	queue   amqp.Queue
+}
+
+type RabbitMQ struct {
+	conn *amqp.Connection
 }

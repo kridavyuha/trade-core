@@ -21,8 +21,13 @@ func initDB(w *types.DataWrapper) error {
 	return nil
 }
 
-func initKVStore(w *types.DataWrapper) {
-	w.Cache = kvstore.NewRedis("localhost:6379", "", 0)
+func initKVStore(w *types.DataWrapper) error {
+	var err error
+	w.Cache, err = kvstore.NewRedis("localhost:6379", "", 0)
+	if err != nil {
+		return fmt.Errorf("Failed to create a new Redis client: %w", err)
+	}
+	return nil
 }
 
 func initProducer(url string) error {
