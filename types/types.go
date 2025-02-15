@@ -24,5 +24,4 @@ type League struct {
 	LeagueID     string    `json:"league_id"`
 	LeagueStatus string    `json:"league_status"`
 	CreatedAt    time.Time `json:"created_at"`
-	StartsAt     time.Time `json:"starts_at"`
 }

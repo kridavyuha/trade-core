@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Create a new exchange
-	err = rabbitMQ.CreateExchange("txns")
+	err = rabbitMQ.InitializeExchange("txns")
 	if err != nil {
 		log.Panic("Unable to create the exchange")
 	}

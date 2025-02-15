@@ -20,3 +20,8 @@ type RabbitMQConsumer struct {
 type RabbitMQ struct {
 	conn *amqp.Connection
 }
+
+const (
+	transactionTypeBuy  = "buy"
+	transactionTypeSell = "sell"
+)
