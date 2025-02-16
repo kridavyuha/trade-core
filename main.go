@@ -36,7 +36,7 @@ func main() {
 	// Create a new exchange
 	err = rabbitMQ.InitializeExchange("txns")
 	if err != nil {
-		log.Panic("Unable to create the exchange")
+		log.Panic("Unable to create the exchange, err is : %s", err)
 	}
 
 	var forever chan struct{}
@@ -44,7 +44,7 @@ func main() {
 	// Consumer should be started by the goroutine spinned by the fetchLeaguesStatusFromDB function.
 	// Handle the case of stopping the consumer also. Stopping includes closing the channel, unbinding the queue from the exchange and closing the channel finally.
 
-	fetchLeagueStatusFromDBTicker := time.NewTicker(5 * time.Minute)
+	fetchLeagueStatusFromDBTicker := time.NewTicker(30 * time.Second)
 	go fetchLeaguesStatusFromDB(rabbitMQ, ctx, fetchLeagueStatusFromDBTicker, dataTier)
 
 	<-forever

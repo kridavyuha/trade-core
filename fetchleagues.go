@@ -15,7 +15,7 @@ func fetchLeaguesStatusFromDB(rabbitmq *receiver.RabbitMQ, ctx context.Context, 
 		case <-ticker.C:
 			// Fetch the leagues table from the database and get the leagues which are not in status 'active'
 			var leagues []types.League
-			res := dataTier.DB.Raw("SELECT league_id, league_status, created_at, starts_at FROM leagues WHERE league_status == 'open' OR league_status == 'close'").Scan(&leagues)
+			res := dataTier.DB.Raw("SELECT league_id, league_status, created_at FROM leagues WHERE league_status = 'open' OR league_status = 'close'").Scan(&leagues)
 			if res.Error != nil {
 				fmt.Println("Error fetching leagues from the database: %w", res.Error)
 				continue
@@ -23,6 +23,7 @@ func fetchLeaguesStatusFromDB(rabbitmq *receiver.RabbitMQ, ctx context.Context, 
 			// Now go through the leagues slice and for each league of status `not started` see if the map already has that status, if yes, skip, if not, call a goroutine to attach the queue to the exchange at starts_at time
 			// Similarly, if the league status is 'completed', but not already reflected in the map, then write a goroutine to detach the queue from the exchange. If already reflected, skip.
 			for _, league := range leagues {
+				fmt.Printf("League: %v\n", league)
 				if league.LeagueStatus == string(leagueStatusOpen) {
 					if _, exists := leagueStatusMap[league.LeagueID]; !exists {
 						leagueStatusMap[league.LeagueID] = leagueStatusOpen
@@ -48,6 +49,7 @@ func attachQueueToExchange(rabbitmq *receiver.RabbitMQ, league types.League, dat
 	queueName := fmt.Sprintf("league_%s", league.LeagueID)
 	exchangeName := "txns"
 	routingKey := fmt.Sprintf("league.%s", league.LeagueID)
+	fmt.Printf("Creating a queue for league %s\n", league.LeagueID)
 	consumer, err := rabbitmq.NewConsumer(queueName, exchangeName, routingKey)
 	if err != nil {
 		fmt.Println("Failed to create a consumer for league %s: %w", league.LeagueID, err)

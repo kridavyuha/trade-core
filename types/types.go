@@ -8,8 +8,8 @@ import (
 )
 
 type TrnxMsg struct {
-	LeagueID        int    `json:"league_id"`
-	PlayerID        int    `json:"player_id"`
+	LeagueID        string `json:"league_id"`
+	PlayerID        string `json:"player_id"`
 	NumOfShares     int    `json:"shares"`
 	UserId          int    `json:"user_id"`
 	TransactionType string `json:"transaction_type"`

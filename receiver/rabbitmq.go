@@ -30,7 +30,7 @@ func (r *RabbitMQ) InitializeExchange(exchangeName string) error {
 
 	err = ch.ExchangeDeclare(
 		exchangeName,
-		"topic",
+		"direct",
 		true,
 		false,
 		false,
@@ -158,7 +158,7 @@ func transactionProcessingWorker(dataTier *types.DataWrapper, transactionMsgList
 		netChange int
 		userCount int
 	}
-	var playerTransactionMap map[int]*playerTransaction
+	var playerTransactionMap map[string]*playerTransaction
 	for _, trnx := range transactionMsgList {
 		playerTransactionMap[trnx.PlayerID].userCount++
 		if trnx.TransactionType == transactionTypeBuy {
@@ -177,7 +177,7 @@ func transactionProcessingWorker(dataTier *types.DataWrapper, transactionMsgList
 	}
 }
 
-func updatePlayerPrice(playerID int, priceDiff float64) error {
+func updatePlayerPrice(playerID string, priceDiff float64) error {
 	// do the DB work here or call a db utility function from a different package
 	return nil
 }
