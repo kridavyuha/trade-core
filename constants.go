@@ -3,7 +3,7 @@ package main
 type LeagueStatus string
 
 const (
-	leagueStatusActive     LeagueStatus = "active"
-	leagueStatusCompleted  LeagueStatus = "completed"
-	leagueStatusNotStarted LeagueStatus = "not started"
+	leagueStatusActive LeagueStatus = "active"
+	leagueStatusClose  LeagueStatus = "close"
+	leagueStatusOpen   LeagueStatus = "open"
 )

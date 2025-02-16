@@ -5,7 +5,7 @@ go 1.23.3
 toolchain go1.23.5
 
 require (
-	github.com/kridavyuha/api-server v0.0.0-20250123154745-f3b7048a7616
+	github.com/kridavyuha/api-server v0.0.0-20250129060843-a658e302dfe8
 	github.com/rabbitmq/amqp091-go v1.10.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
