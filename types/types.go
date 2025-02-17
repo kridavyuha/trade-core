@@ -25,3 +25,9 @@ type League struct {
 	LeagueStatus string    `json:"league_status"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+type PlayerTransaction struct {
+	NetChange int    `json:"net_change"`
+	UserCount int    `json:"user_count"`
+	LeagueID  string `json:"league_id"`
+}
