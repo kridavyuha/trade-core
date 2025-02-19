@@ -15,15 +15,15 @@ func fetchLeaguesStatusFromDB(rabbitmq *receiver.RabbitMQ, ctx context.Context, 
 		case <-ticker.C:
 			// Fetch the leagues table from the database and get the leagues which are not in status 'active'
 			var leagues []types.League
-			res := dataTier.DB.Raw("SELECT league_id, league_status, created_at FROM leagues WHERE league_status = 'open' OR league_status = 'close'").Scan(&leagues)
+			res := dataTier.DB.Raw("SELECT league_id, league_status, created_at FROM leagues WHERE league_status = 'open' OR league_status = 'close' OR league_status = '").Scan(&leagues)
 			if res.Error != nil {
 				fmt.Println("Error fetching leagues from the database: %w", res.Error)
 				continue
 			}
 			// Now go through the leagues slice and for each league of status `not started` see if the map already has that status, if yes, skip, if not, call a goroutine to attach the queue to the exchange at starts_at time
 			// Similarly, if the league status is 'completed', but not already reflected in the map, then write a goroutine to detach the queue from the exchange. If already reflected, skip.
+			fmt.Printf("Fetched Open League and closed leagues: %v\n", leagues)
 			for _, league := range leagues {
-				fmt.Printf("League: %v\n", league)
 				if league.LeagueStatus == string(leagueStatusOpen) {
 					if _, exists := leagueStatusMap[league.LeagueID]; !exists {
 						leagueStatusMap[league.LeagueID] = leagueStatusOpen
@@ -34,6 +34,12 @@ func fetchLeaguesStatusFromDB(rabbitmq *receiver.RabbitMQ, ctx context.Context, 
 					if status, exists := leagueStatusMap[league.LeagueID]; !exists || status != leagueStatusClose {
 						leagueStatusMap[league.LeagueID] = leagueStatusClose
 						go detachQueueFromExchange(rabbitmq, league, dataTier)
+					}
+				}
+				if league.LeagueStatus == string(leagueStatusActive) {
+					if status, exists := leagueStatusMap[league.LeagueID]; !exists || status != leagueStatusActive {
+						leagueStatusMap[league.LeagueID] = leagueStatusActive
+						go attachQueueToExchange(rabbitmq, league, dataTier)
 					}
 				}
 			}
@@ -60,7 +66,7 @@ func attachQueueToExchange(rabbitmq *receiver.RabbitMQ, league types.League, dat
 	consumer.StartConsuming(context.Background(), routingKey, dataTier) // needs to be reevaluated--TODO: @anveshreddy18
 }
 
-func detachQueueFromExchange(rabbitmq *receiver.RabbitMQ, league types.League, dataTier *types.DataWrapper) {
+func detachQueueFromExchange(_ *receiver.RabbitMQ, league types.League, dataTier *types.DataWrapper) {
 	if consumer, exists := leagueConsumerMap[league.LeagueID]; exists {
 		routingKey := fmt.Sprintf("league.%s", league.LeagueID)
 		consumer.CloseConsumer(routingKey)
