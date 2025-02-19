@@ -1,0 +1,57 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Build Core server
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go-version: [1.23.x]
+       
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      # You can test your matrix by printing the current Go version
+      - name: Display Go version
+        run: go version
+      
+      - name: Install dependencies
+        run: |
+          go mod download
+
+      - name: Build code
+        run: GOOS=linux GOARCH=amd64 go build -o core_amd64 *.go
+      
+      - name: SCP and Copy code
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY  }}
+          HOSTNAME: ${{ secrets.HOSTNAME  }}
+          USER_NAME: ${{ secrets.USER_NAME  }}
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          scp -o StrictHostKeyChecking=no -i private_key -r ./core_amd64 ${USER_NAME}@${HOSTNAME}:/tmp
+          
+      - name: Deploy and restart
+        env:
+            PRIVATE_KEY: ${{ secrets.PRIVATE_KEY  }}
+            HOSTNAME: ${{ secrets.HOSTNAME  }}
+            USER_NAME: ${{ secrets.USER_NAME  }}
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME} '
+          # Now we have got the access of EC2 and we will start the deploy .
+          pm2 stop core
+          cp /tmp/core_amd64 /var/apps/core/
+          pm2 restart core '
+        
