@@ -188,7 +188,7 @@ func updatePlayersCurPrice(dataTier *types.DataWrapper, playerID string, transac
 	return nil
 }
 
-func processTransactionOfPlayerWhenNetPositveOrZero(dataTier *types.DataWrapper, playerID string, transactionMsgList []*types.TrnxMsg, playerTransactionMap map[string]*types.PlayerTransaction) {
+func processTransactionOfPlayerWhenNetNegative(dataTier *types.DataWrapper, playerID string, transactionMsgList []*types.TrnxMsg, playerTransactionMap map[string]*types.PlayerTransaction) {
 	// First step::
 	// For each user transaction, give them the shares they asked for, or want to sell at the current price of the player as fetched from the player table
 	// use goroutines to do the transactions
@@ -203,7 +203,7 @@ func processTransactionOfPlayerWhenNetPositveOrZero(dataTier *types.DataWrapper,
 	updatePlayersCurPrice(dataTier, playerID, calulateNetSharesPerPlayer(transactionMsgList)[playerID])
 }
 
-func processTransactionOfPlayerWhenNetNegative(dataTier *types.DataWrapper, playerID string, transactionMsgList []*types.TrnxMsg, playerTransactionMap map[string]*types.PlayerTransaction) {
+func processTransactionOfPlayerWhenNetPositveOrZero(dataTier *types.DataWrapper, playerID string, transactionMsgList []*types.TrnxMsg, playerTransactionMap map[string]*types.PlayerTransaction) {
 	// First step::
 	// loop through the list and for each player(identified by their PlayerID), identify the avg share count, which is used to compute the price by which the player price needs to be updated.
 	// It is computed as follows => avgShareCount*(somefactor). Now there could be some buys and there could be some sells, so get the net number based on the transaction type and divide by the number of users who requested for the transaction
@@ -279,12 +279,17 @@ func updatePlayerPrice(dataTier *types.DataWrapper, playerID string, leagueID st
 	}
 
 	// Update the price
-	newPrice := curPrice + avgNetShares*(0.1/100)*curPrice
+	newPrice := curPrice + avgNetShares*(0.05/100)*curPrice
 
 	// add entry in cache
 	err = dataTier.Cache.RPush("players_"+leagueID+"_"+playerID, fmt.Sprintf("%d,%.2f", time.Now().Unix(), newPrice))
 	if err != nil {
 		return fmt.Errorf("failed to update the player price in cache: %v", err)
+	}
+	// also update into a players_<league_id> map
+	err = dataTier.Cache.HSet("players_"+leagueID, playerID, fmt.Sprintf("%.2f", newPrice))
+	if err != nil {
+		return fmt.Errorf("failed to update the player price in cache (players_<league_id> key): %v", err)
 	}
 	// update to players_<league_id> table
 	err = dataTier.DB.Exec("UPDATE players_"+leagueID+" SET cur_price = ? WHERE player_id = ?", newPrice, playerID).Error
@@ -323,7 +328,7 @@ func getPurse(dataTier *types.DataWrapper, userId int, leagueId string) (string,
 			return "0", err
 		}
 	}
-	
+
 	return balanceAndRemainingTxnsStr, nil
 }
 
