@@ -15,7 +15,7 @@ func fetchLeaguesStatusFromDB(rabbitmq *receiver.RabbitMQ, ctx context.Context, 
 		case <-ticker.C:
 			// Fetch the leagues table from the database and get the leagues which are not in status 'active'
 			var leagues []types.League
-			res := dataTier.DB.Raw("SELECT league_id, league_status, created_at FROM leagues WHERE league_status = 'open' OR league_status = 'close' OR league_status = '").Scan(&leagues)
+			res := dataTier.DB.Raw("SELECT league_id, league_status, created_at FROM leagues WHERE league_status = 'open' OR league_status = 'close' OR league_status = 'active'").Scan(&leagues)
 			if res.Error != nil {
 				fmt.Println("Error fetching leagues from the database: %w", res.Error)
 				continue
