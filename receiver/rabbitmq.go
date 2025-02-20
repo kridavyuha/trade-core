@@ -521,7 +521,7 @@ func InsertNotifiction(dataTier *types.DataWrapper, txnID int, txnPrice float64,
 	}
 
 	// insert into notificaiton
-	err = dataTier.DB.Exec("INSERT into notification (notification_obj_id,notifier_id,status,actor_id) VALUES (?,?,?,?)", notif_obj_id, transactionDetails.UserId, "unseen", 0).Error
+	err = dataTier.DB.Exec("INSERT into notification (notification_obj_id,notifier_id,status,actor_id) VALUES (?,?,?,?)", notif_obj_id, transactionDetails.UserId, "unseen", 1).Error
 	if err != nil {
 		return fmt.Errorf("unable to insert into notification, err: %v", err)
 	}
