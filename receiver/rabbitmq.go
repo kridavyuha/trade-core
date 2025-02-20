@@ -419,7 +419,7 @@ func Transaction(dataTier *types.DataWrapper, transactionDetails *types.TrnxMsg)
 	}
 
 	var txnID int
-	err = dataTier.DB.Exec("INSERT INTO transactions (user_id, player_id, league_id, shares, price, transaction_type, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id", transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID, transactionDetails.NumOfShares, curPrice, transactionDetails.TransactionType, time.Now()).Scan(&txnID).Error
+	err = dataTier.DB.Raw("INSERT INTO transactions (user_id, player_id, league_id, shares, price, transaction_type, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id", transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID, transactionDetails.NumOfShares, curPrice, transactionDetails.TransactionType, time.Now()).Scan(&txnID).Error
 	if err != nil {
 		return err
 	}
@@ -514,20 +514,14 @@ func InsertNotifiction(dataTier *types.DataWrapper, txnID int, txnPrice float64,
 
 	// insert into notif_obj
 	var notif_obj_id int
-	err := dataTier.DB.Exec("INSERT into notification_obj (entity_type_id, entity_id, created_at) VALUES (?, ?, ?) RETURNING id", entity_type, txnID, time.Now()).Scan(&notif_obj_id).Error
+	err := dataTier.DB.Raw("INSERT into notification_obj (entity_type_id, entity_id, created_at) VALUES (?, ?, ?) RETURNING id", entity_type, txnID, time.Now()).Scan(&notif_obj_id).Error
 
 	if err != nil {
 		return fmt.Errorf("unable to insert notif_obj, err: %v", err)
 	}
 
-	// insert the actor details... for all the transactions admin is the actor
-	err = dataTier.DB.Exec("INSERT into notification_change (notification_obj_id, actor) VALUES (?,?)", notif_obj_id, 0).Error
-	if err != nil {
-		return fmt.Errorf("unable to insert into notificaiton_chg, err: %v", err)
-	}
-
 	// insert into notificaiton
-	err = dataTier.DB.Exec("INSERT into notification (notification_obj_id,notifier_id,status) VALUES (?,?,?)", notif_obj_id, transactionDetails.UserId, "unseen").Error
+	err = dataTier.DB.Exec("INSERT into notification (notification_obj_id,notifier_id,status,actor_id) VALUES (?,?,?,?)", notif_obj_id, transactionDetails.UserId, "unseen", 0).Error
 	if err != nil {
 		return fmt.Errorf("unable to insert into notification, err: %v", err)
 	}
