@@ -460,20 +460,25 @@ func UpdatePortfolio(dataTier *types.DataWrapper, transactionDetails *types.Trnx
 		fmt.Printf("In buy , Existing Shares: %d, current Price: %f", shares, curPrice)
 		// Update or insert the shares if player is already in the portfolio
 		if shares == -1 {
-			// Update in table first...
-			err := dataTier.DB.Exec("INSERT INTO portfolio (user_id, player_id, league_id, shares) VALUES (?, ?, ?, ?)", transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID, transactionDetails.NumOfShares).Error
+			// Update in table first... -1 indicates no shares previously
+			err := dataTier.DB.Exec("INSERT INTO portfolio (user_id, player_id, league_id, shares, avg_price) VALUES (?, ?, ?, ?, ?)", transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID, transactionDetails.NumOfShares, curPrice).Error
 			if err != nil {
 				return err
 			}
 
 			// Update in cache
-			err = dataTier.Cache.HSet("portfolio_"+strconv.Itoa(transactionDetails.UserId)+"_"+transactionDetails.LeagueID, transactionDetails.PlayerID, strconv.Itoa(transactionDetails.NumOfShares)+","+strconv.Itoa(0))
+			err = dataTier.Cache.HSet("portfolio_"+strconv.Itoa(transactionDetails.UserId)+"_"+transactionDetails.LeagueID, transactionDetails.PlayerID, strconv.Itoa(transactionDetails.NumOfShares)+","+fmt.Sprintf("%.2f", curPrice))
 			if err != nil {
 				return err
 			}
 		} else {
-
-			err := dataTier.DB.Exec("UPDATE portfolio SET shares = shares + ? WHERE user_id = ? AND player_id = ? AND league_id = ?", transactionDetails.NumOfShares, transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID).Error
+			// get the previous avg price and create a new one.
+			var avg_price float64
+			err := dataTier.DB.Raw("select avg_price from portfolio where user_id = ? AND player_id = ? AND league_id = ?", transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID).Scan(&avg_price).Error
+			if err != nil {
+				return err
+			}
+			err = dataTier.DB.Exec("UPDATE portfolio SET shares = shares + ?, avg_price = ? WHERE user_id = ? AND player_id = ? AND league_id = ?", transactionDetails.NumOfShares, avg_price, transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID).Error
 			if err != nil {
 				return err
 			}
@@ -489,7 +494,7 @@ func UpdatePortfolio(dataTier *types.DataWrapper, transactionDetails *types.Trnx
 		fmt.Printf("In Sell , Existing Shares: %d, current Price: %f", shares, curPrice)
 		shares -= transactionDetails.NumOfShares
 
-		err := dataTier.DB.Exec("UPDATE portfolio SET shares = ? WHERE user_id = ? AND player_id = ? AND league_id = ?", shares, transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID).Error
+		err := dataTier.DB.Exec("UPDATE portfolio SET shares = ?, avg_price = avg_price - ? WHERE user_id = ? AND player_id = ? AND league_id = ?", shares, curPrice, transactionDetails.UserId, transactionDetails.PlayerID, transactionDetails.LeagueID).Error
 		if err != nil {
 			return err
 		}
