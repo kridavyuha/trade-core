@@ -281,8 +281,12 @@ func updatePlayerPrice(dataTier *types.DataWrapper, playerID string, leagueID st
 	// Update the price
 	newPrice := curPrice + avgNetShares*(0.05/100)*curPrice
 
+	now := time.Now()
+
+	timestamp := now.Format("2006-01-02 15:04:05.000000-07")
+
 	// add entry in cache
-	err = dataTier.Cache.RPush("players_"+leagueID+"_"+playerID, fmt.Sprintf("%d,%.2f", time.Now().Unix(), newPrice))
+	err = dataTier.Cache.RPush("players_"+leagueID+"_"+playerID, fmt.Sprintf("%s,%.2f", timestamp, newPrice))
 	if err != nil {
 		return fmt.Errorf("failed to update the player price in cache: %v", err)
 	}
